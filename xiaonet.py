@@ -53,14 +53,14 @@ class Input(Layer):
 
 class Hidden(Layer):
     """ Input dot Weight is done here """
-    def __init__(self, inbound_layer, weights):
-        Layer.__init__(self, [inbound_layer, weights])
+    def __init__(self, inbound_layer, weights, bias):
+        Layer.__init__(self, [inbound_layer, weights, bias])
 
     def forward(self):
         inputs = self.incoming_layers[0].value
         weights = self.incoming_layers[1].value
         bias = self.incoming_layers[2].value
-        self.value = np.dot(inputs.T, weights)
+        self.value = np.dot(inputs.T, weights) + bias
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
@@ -138,7 +138,7 @@ class Softmax(Layer):
         for n in self.outbound_layers:
             grad_cost = n.gradients[self]
             softmax = self.value
-            self.gradients[self.incoming_layers[0]] += softmax * (1 - sigmoid) * grad_cost
+            self.gradients[self.incoming_layers[0]] += softmax * (1 - softmax) * grad_cost
 
 
 class CrossEntropy(Layer):
@@ -161,7 +161,7 @@ class CrossEntropy(Layer):
         """
         # Save the computed output for backward.
         self.computed_output = self.incoming_layers[0].value
-        self.value = self.ideal_ouput.dot(np.log(self.computed_output))
+        self.value = self.ideal_output.dot(np.log(self.computed_output))
 
     def backward(self):
         """
@@ -238,7 +238,7 @@ def topological_sort(feed_dict, ideal_output):
 
         if isinstance(n, Input):
             n.value = feed_dict[n]
-        if isinstance(n, MSE):
+        if isinstance(n, CrossEntropy) or isinstance(n, MSE):
             n.ideal_output = ideal_output
             # there is only 1 input in this example
             n.n_inputs = 1
