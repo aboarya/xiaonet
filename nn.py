@@ -19,7 +19,7 @@ def train_mnist():
 
         ideal_output = data['label']
         
-        f = Hidden(inputs, weights, bias)
+        f = HiddenLayers(inputs, weights, bias)
         g = Softmax(f)
         cost = CrossEntropy(g)
 

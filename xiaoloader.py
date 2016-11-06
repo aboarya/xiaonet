@@ -13,12 +13,12 @@ def load_mnist_training():
     i = 0
     for row in rows:
         data[str(i)] = dict(
-            digit=row[0],
+            digit=int(row[0]),
             img=(np.asfarray(row[1:]).flatten() / 255.0 * 0.99) + 0.01,
             
         )
         label = np.zeros(10) + 0.01
-        label[row[0]] = 0.99
+        label[int(row[0])] = 0.99
         data[str(i)]['label'] = label
         
         i+=1

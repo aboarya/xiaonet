@@ -14,7 +14,7 @@ class Layer:
         self.incoming_layers = incoming_layers
         self.value = None
         self.outbound_layers = []
-        self.gradients = {}
+        self.gradient = 0.
         
         for layer in incoming_layers:
             layer.outbound_layers.append(self)
@@ -33,6 +33,11 @@ class Layer:
         """
         raise NotImplementedError
 
+    def g_prime(self):
+        if isinstance(self.value, (np.ndarray, np.generic)):
+            return self.value.dot(( 1 - self.value))
+        return self.value * (1 - self.value)
+
 
 class Input(Layer):
     """
@@ -46,16 +51,13 @@ class Input(Layer):
         pass
 
     def backward(self):
-        self.gradients = {self: 0}
-        for n in self.outbound_layers:
-            self.gradients[self] += n.gradients[self]
+        pass
 
-
-class Hidden(Layer):
-    """ Input dot Weight is done here """
+class HiddenLayers(Layer):
+    """ Represets all the Hidden Layers """
     def __init__(self, inbound_layer, weights, bias):
         Layer.__init__(self, [inbound_layer, weights, bias])
-
+        
     def forward(self):
         inputs = self.incoming_layers[0].value
         weights = self.incoming_layers[1].value
@@ -64,14 +66,15 @@ class Hidden(Layer):
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
-        self.gradients = {n: np.zeros_like(n.value) for n in self.incoming_layers}
-        for n in self.outbound_layers:
-            grad_cost = n.gradients[self]
-            # Set the partial of the loss with respect to this layer's inputs.
-            self.gradients[self.incoming_layers[0]] += np.dot(grad_cost, self.incoming_layers[1].value)
-            # Set the partial of the loss with respect to this layer's weights.
-            self.gradients[self.incoming_layers[1]] += np.dot(self.incoming_layers[0].value.T, grad_cost)
-
+        incoming_gradient = self.outbound_layers[0].gradient
+        start = True
+        for n in self.incoming_layers[::-1]:
+            if not start:
+                incoming_gradient = n.gradient
+            
+            start = False
+            self.gradient += np.dot(np.multiply(self.value.T, incoming_gradient), self.g_prime())
+            
 
 class Sigmoid(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
@@ -132,13 +135,12 @@ class Softmax(Layer):
         Calculates the gradient using the derivative of
         the softmax function.
         """
-        # Initialize the gradients to 0.
-        self.gradients = {n: np.zeros_like(n.value) for n in self.incoming_layers}
-        # Sum the partial with respect to the input over all the outputs.
+        if isinstance(self.gradient, float):
+            self.gradient = np.zeros_like(self.value)
+
         for n in self.outbound_layers:
-            grad_cost = n.gradients[self]
-            softmax = self.value
-            self.gradients[self.incoming_layers[0]] += softmax * (1 - softmax) * grad_cost
+            incoming_grad = n.gradient
+        self.gradient += incoming_grad * self.g_prime()
 
 
 class CrossEntropy(Layer):
@@ -161,13 +163,15 @@ class CrossEntropy(Layer):
         """
         # Save the computed output for backward.
         self.computed_output = self.incoming_layers[0].value
-        self.value = self.ideal_output.dot(np.log(self.computed_output))
+        self.value = -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
+        #print("????????", np.sum(self.computed_output))
+        #import sys;sys.exit(0)
 
     def backward(self):
         """
         Calculates the gradient of the cost.
         """
-        self.gradients[self.incoming_layers[0]] = self.ideal_output - self.computed_output
+        self.gradient += (self.computed_output -  self.ideal_output)
 
             
 class MSE(Layer):
@@ -252,36 +256,6 @@ def topological_sort(feed_dict, ideal_output):
                 S.add(m)
     return L
 
-
-def forward_and_backward(feed_dict, ideal_output, trainables=[]):
-    """
-    Performs a forward pass and a backward pass through a list of sorted Layers.
-
-    Returns a list of the gradients on the trainables.
-
-    Arguments:
-
-        `feed_dict`: A dictionary where the key is a `Input` Layer and the value is the respective value feed to that Layer.
-        `ideal_output`: The correct output value for the last activation layer.
-        `trainables`: Inputs that need to be modified by SGD.
-    """
-
-    sorted_layers = topological_sort(feed_dict, ideal_output)
-
-    # Forward pass
-    for n in sorted_layers:
-        n.forward()
-
-    # Backward pass
-    reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
-
-    for n in reversed_layers:
-        n.backward()
-
-    # Returns a list of the gradients on the weights and bias (the trainables).
-    return [n.gradients[n] for n in trainables]
-
-
 def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=1e-2):
     """
     Performs many forward passes and a backward passes through
@@ -298,12 +272,20 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=1e
     """
 
     sorted_layers = topological_sort(feed_dict, ideal_output)
-
+    
     for i in range(epochs):
         # Forward pass
-        for n in sorted_layers:
+        for n in sorted_layers[:-1]:
+            n.forward()
+        
+        # Forward again
+        for n in sorted_layers[:-1]:
             n.forward()
 
+        # Ouput
+        output_layer = sorted_layers[-1]
+        output_layer.forward()
+        
         # Backward pass
         reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
 
@@ -312,7 +294,7 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=1e
 
         # Performs SGD
         # Get a list of the partials with respect to each trainable input.
-        partials = [n.gradients[n] for n in trainables]
+        partials = [n.gradient for n in trainables]
         # Loop over the trainables
         for n in range(len(trainables)):
             # Change the trainable's value by subtracting the learning rate
