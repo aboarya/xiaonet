@@ -24,8 +24,7 @@ def train_mnist():
         cost = CrossEntropy(g)
 
         feed_dict = {inputs: x, weights: w, bias: b}
-
-        train_SGD(feed_dict, ideal_output, [weights, bias], 1000)
-        break
-
+        loss = train_SGD(feed_dict, ideal_output, [weights, bias], 1000)
+        print(' Loss: ', loss)
+    
 train_mnist()

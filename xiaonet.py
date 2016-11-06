@@ -164,8 +164,6 @@ class CrossEntropy(Layer):
         # Save the computed output for backward.
         self.computed_output = self.incoming_layers[0].value
         self.value = -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
-        #print("????????", np.sum(self.computed_output))
-        #import sys;sys.exit(0)
 
     def backward(self):
         """
@@ -301,6 +299,5 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=1e
             # multiplied by the partial of the cost with respect to this
             # trainable.
             trainables[n].value -= learning_rate * partials[n]
-        print('Epoch: ' + str(i) + ', Loss: ' + str(sorted_layers[-1].value))
-
+    
     return sorted_layers[-1].value
