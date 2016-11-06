@@ -35,7 +35,8 @@ class Layer:
 
     def g_prime(self):
         if isinstance(self.value, (np.ndarray, np.generic)):
-            return self.value.dot(( 1 - self.value))
+            #return self.value.dot(( 1 - self.value))
+            return np.multiply(self.value, (1-self.value))
         return self.value * (1 - self.value)
 
 
@@ -62,26 +63,29 @@ class HiddenLayers(Layer):
         inputs = self.incoming_layers[0].value
         weights = self.incoming_layers[1].value
         bias = self.incoming_layers[2].value
-        self.value = np.dot(inputs.T, weights) + bias
+        h = np.sum(np.dot(inputs, weights))
+        self.value = h + bias
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
         incoming_gradient = self.outbound_layers[0].gradient
         start = True
-        for n in self.incoming_layers[::-1]:
+        prev_layers = self.incoming_layers[:0:-1]
+        for i in range(len(prev_layers)):
+            n = prev_layers[i]
             if not start:
-                incoming_gradient = n.gradient
-            
+                incoming_gradient = prev_layers[i-1].gradient
             start = False
-            self.gradient += np.dot(np.multiply(self.value.T, incoming_gradient), self.g_prime())
-
+            h = n.value.T * incoming_gradient
+            n.gradient +=  np.dot(h, n.g_prime())
+            
     def query(self, x):
-        # convert inputs list to 2d array
         weights = self.incoming_layers[1].value
         bias = self.incoming_layers[2].value
-
         orig_value = np.copy(self.value)
-        self.value = np.dot(x.T, weights) + bias
+        
+        h = np.dot(x, weights)
+        self.value = h + bias
         self.outbound_layers[0].forward()
         self.value = np.copy(orig_value)
         return self.outbound_layers[0].value
@@ -139,7 +143,9 @@ class Softmax(Layer):
         """ Perform the sigmoid function and set the value."""
 
         input_value = self.incoming_layers[0].value
+        print(">>>", input_value)
         self.value = self._softmax(input_value)
+        print(self.value,">>>>")
 
     def backward(self):
         """
@@ -153,14 +159,13 @@ class Softmax(Layer):
             incoming_grad = n.gradient
         self.gradient += incoming_grad * self.g_prime()
 
-
 class CrossEntropy(Layer):
     def __init__(self, inbound_layer):
         """
         The multi-class classifier.
         Should be used as the last layer for a network.
 
-        Arguments:
+        Arguments
             `inbound_layer`: A layer with an activation function.
         """
         # Call the base class' constructor.
@@ -264,51 +269,3 @@ def topological_sort(feed_dict, ideal_output):
             if len(G[m]['in']) == 0:
                 S.add(m)
     return L
-
-def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=1e-2):
-    """
-    Performs many forward passes and a backward passes through
-    a list of sorted Layers while performing stochastic gradient
-    descent.
-
-    Arguments:
-
-        `feed_dict`: A dictionary where the key is a `Input` Layer and the value is the respective value feed to that Layer.
-        `ideal_output`: The correct output value for the last activation layer.
-        `trainables`: Inputs that need to be modified by SGD.
-        `epochs`: The number of times to train against all training inputs.
-        `learning_rate`: The step size for changes by each gradient.
-    """
-
-    sorted_layers = topological_sort(feed_dict, ideal_output)
-    
-    for i in range(epochs):
-        # Forward pass
-        for n in sorted_layers[:-1]:
-            n.forward()
-        
-        # Forward again
-        for n in sorted_layers[:-1]:
-            n.forward()
-
-        # Ouput
-        output_layer = sorted_layers[-1]
-        output_layer.forward()
-        
-        # Backward pass
-        reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
-
-        for n in reversed_layers:
-            n.backward()
-
-        # Performs SGD
-        # Get a list of the partials with respect to each trainable input.
-        partials = [n.gradient for n in trainables]
-        # Loop over the trainables
-        for n in range(len(trainables)):
-            # Change the trainable's value by subtracting the learning rate
-            # multiplied by the partial of the cost with respect to this
-            # trainable.
-            trainables[n].value -= learning_rate * partials[n]
-    
-    return sorted_layers[-1].value
