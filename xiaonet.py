@@ -74,6 +74,17 @@ class HiddenLayers(Layer):
             
             start = False
             self.gradient += np.dot(np.multiply(self.value.T, incoming_gradient), self.g_prime())
+
+    def query(self, x):
+        # convert inputs list to 2d array
+        weights = self.incoming_layers[1].value
+        bias = self.incoming_layers[2].value
+
+        orig_value = np.copy(self.value)
+        self.value = np.dot(x.T, weights) + bias
+        self.outbound_layers[0].forward()
+        self.value = np.copy(orig_value)
+        return self.outbound_layers[0].value
             
 
 class Sigmoid(Layer):
