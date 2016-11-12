@@ -22,16 +22,13 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
     sorted_layers = topological_sort(feed_dict, ideal_output)
     
     # Forward pass
-    for n in sorted_layers[:-1]:
+    for n in sorted_layers:
         n.forward()
-        
-    # Forward again
-    #for n in sorted_layers[:-1]:
-    #    n.forward()
 
+    return
     # Ouput
-    output_layer = sorted_layers[-1]
-    output_layer.forward()
+    #output_layer = sorted_layers[-1]
+    #output_layer.forward()
     
     # Backward pass
     reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
@@ -54,9 +51,9 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
 
 validation_data = None
 inputs, weights, bias = Input(), Input(), Input()
-f = HiddenLayers(inputs, weights, bias)
+f = LogisticRegression(inputs, weights, bias)
 g = Softmax(f)
-cost = CrossEntropy(g)
+distance = CrossEntropy(g)
 
 mnist_data = xiaoloader.load_mnist_training()
 training_data = {k:v for k,v in mnist_data.items() if int(k) >= (len(mnist_data.keys())*.7)}
@@ -67,30 +64,25 @@ def train_mnist():
     i = 0
     for index, data in training_data.items():
         digit = data['digit']
-        
         x =  data['img']
-        w = np.random.normal(0.0, pow(10, -0.5), 784)
-        
+        w = np.random.normal(0.0, pow(10, -0.5), (784, 10))        
         b = np.random.normal(0.0, pow(10, -0.5), 10)
-     
         ideal_output = data['label']
         feed_dict = {inputs: x, weights: w, bias: b}
-        loss = train_SGD(feed_dict, ideal_output, [weights, bias], 1000)
-        if i > 5: break
-        i+= 1
+        train_SGD(feed_dict, ideal_output, [weights, bias], 1000)
+    loss = distance.value / len(training_data.keys())
     return loss
 
-for i in range(2):
+for i in range(1):
     print('Epoch: ' + str(i) + ', Loss: ' + str(train_mnist())) 
     
-#import sys;sys.exit(1)
+import sys;sys.exit(1)
 correct = 0
 for index, data in validation_data.items():
     digit = data['digit']
     x =  data['img']
     values = f.query(x)
     if digit == np.argmax(values):
-        print(">>>>>>??????????????????????")
         print(digit, values)
         correct += 1
     break

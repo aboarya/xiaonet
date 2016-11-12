@@ -54,7 +54,7 @@ class Input(Layer):
     def backward(self):
         pass
 
-class HiddenLayers(Layer):
+class LogisticRegression(Layer):
     """ Represets all the Hidden Layers """
     def __init__(self, inbound_layer, weights, bias):
         Layer.__init__(self, [inbound_layer, weights, bias])
@@ -63,7 +63,7 @@ class HiddenLayers(Layer):
         inputs = self.incoming_layers[0].value
         weights = self.incoming_layers[1].value
         bias = self.incoming_layers[2].value
-        h = np.sum(np.dot(inputs, weights))
+        h = np.sum(np.dot(inputs.T, weights))
         self.value = h + bias
 
     def backward(self):
@@ -125,6 +125,7 @@ class Sigmoid(Layer):
             sigmoid = self.value
             self.gradients[self.incoming_layers[0]] += sigmoid * (1 - sigmoid) * grad_cost
 
+
 class Softmax(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
     
@@ -143,9 +144,7 @@ class Softmax(Layer):
         """ Perform the sigmoid function and set the value."""
 
         input_value = self.incoming_layers[0].value
-        print(">>>", input_value)
         self.value = self._softmax(input_value)
-        print(self.value,">>>>")
 
     def backward(self):
         """
@@ -172,6 +171,7 @@ class CrossEntropy(Layer):
         Layer.__init__(self, [inbound_layer])
         self.ideal_output = None
         self.n_inputs = None
+        self.value = 0.
 
     def forward(self):
         """
@@ -179,13 +179,13 @@ class CrossEntropy(Layer):
         """
         # Save the computed output for backward.
         self.computed_output = self.incoming_layers[0].value
-        self.value = -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
+        self.value += -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
 
     def backward(self):
         """
         Calculates the gradient of the cost.
         """
-        self.gradient += (self.computed_output -  self.ideal_output)
+        self.gradient += (self.computed_output - self.ideal_output)
 
             
 class MSE(Layer):
