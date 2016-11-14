@@ -33,7 +33,7 @@ class Layer:
         """
         raise NotImplementedError
 
-    def linear_transorm(self):
+    def linear_transform(self):
         """ perform linear transorm """
         h = np.sum(np.dot(self.x.T, self.w))
         self.value = h + self.b
@@ -48,14 +48,15 @@ class Input(Layer):
         self.b = bias
         
     def forward(self):
-        self.linear_transform()
+        Layer.linear_transform(self)
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
-        self.input_gradient = self.outbound_layers[0].gradient
-        self.d_w1 = self.outbound_layers[0].d_l2 * self.x.T
-        self.d_b1 = self.outbound_layers[0]
-        self.gradient = self.input_gradient + self.d_w1 + self.d_b1
+        #self.input_gradient = self.outbound_layers[0].gradient
+        self.d_w1 = self.outbound_layers[0].gradient * self.x.T
+        self.d_b1 = self.outbound_layers[0].gradient
+        self.d_b2 = self.outbound_layers[0].gradient1
+        
 
                                          
 class Linear(Layer):
@@ -67,13 +68,15 @@ class Linear(Layer):
         self.b = bias
 
     def forward(self):
-        self.linear_transform()
+        Layer.linear_transform(self)
 
     def backward(self):
-        self.d_l3 = self.d_b2 = self.outbound_layers[0].gradient
-        self.d_l2 = self.input_gradient * self.w.T
-        self.d_w2 =  self.d_l * self.x.T
-        self.gradient = self.input_gradient + self.d_l3 + self.d_l2 + self.d_w2 + self.d_l3
+        #self.d_l3 = self.d_b2 = self.outbound_layers[0].gradient
+        self.gradient = self.input_gradient * self.w.T
+        self.gradient1 = self.outbound_layers[0].gradient
+        #self.d_w2 =  self.d_l * self.x.T
+        #self.gradient = self.input_gradient + self.d_l3 + self.d_l2 + self.d_w2 + self.d_l3
+        pass
         
 
 class Softmax(Layer):
