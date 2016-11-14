@@ -33,98 +33,48 @@ class Layer:
         """
         raise NotImplementedError
 
-    def g_prime(self):
-        if isinstance(self.value, (np.ndarray, np.generic)):
-            #return self.value.dot(( 1 - self.value))
-            return np.multiply(self.value, (1-self.value))
-        return self.value * (1 - self.value)
+    def linear_transorm(self):
+        """ perform linear transorm """
+        h = np.sum(np.dot(self.x.T, self.w))
+        self.value = h + self.b
 
 
 class Input(Layer):
-    """
-    A generic input into the network.
-    """
-    def __init__(self):
-        Layer.__init__(self)
-
-    def forward(self):
-        # Do nothing because nothing is calculated.
-        pass
-
-    def backward(self):
-        pass
-
-class LogisticRegression(Layer):
     """ Represets all the Hidden Layers """
-    def __init__(self, inbound_layer, weights, bias):
-        Layer.__init__(self, [inbound_layer, weights, bias])
+    def __init__(self, feature, weights, bias):
+        Layer.__init__(self)
+        self.x = feature
+        self.w = weights
+        self.b = bias
         
     def forward(self):
-        inputs = self.incoming_layers[0].value
-        weights = self.incoming_layers[1].value
-        bias = self.incoming_layers[2].value
-        h = np.sum(np.dot(inputs.T, weights))
-        self.value = h + bias
+        self.linear_transform()
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
-        incoming_gradient = self.outbound_layers[0].gradient
-        start = True
-        prev_layers = self.incoming_layers[:0:-1]
-        for i in range(len(prev_layers)):
-            n = prev_layers[i]
-            if not start:
-                incoming_gradient = prev_layers[i-1].gradient
-            start = False
-            h = n.value.T * incoming_gradient
-            n.gradient +=  np.dot(h, n.g_prime())
-            
-    def query(self, x):
-        weights = self.incoming_layers[1].value
-        bias = self.incoming_layers[2].value
-        orig_value = np.copy(self.value)
+        self.input_gradient = self.outbound_layers[0].gradient
+        self.d_w1 = self.outbound_layers[0].d_l2 * self.x.T
+        self.d_b1 = self.outbound_layers[0]
+        self.gradient = self.input_gradient + self.d_w1 + self.d_b1
+
+                                         
+class Linear(Layer):
         
-        h = np.dot(x, weights)
-        self.value = h + bias
-        self.outbound_layers[0].forward()
-        self.value = np.copy(orig_value)
-        return self.outbound_layers[0].value
-            
-
-class Sigmoid(Layer):
-    """ Represents a layer that performs the sigmoid activation function. """
-    
-    def __init__(self, layer):
-        Layer.__init__(self, [layer])
-
-    def _sigmoid(self, x):
-        """
-        Calculate Sigmoid
-
-        `x`: A numpy array-like object.
-        """
-        return 1. / (1. + np.exp(-x))
+    def __init__(self, input_layer, weights, bias):
+        Layer.__init__(self, [input_layer])
+        self.x = self.incoming_layers[0].value
+        self.w = weights
+        self.b = bias
 
     def forward(self):
-        """
-        Perform the sigmoid function and set the value.
-        """
-        input_value = self.incoming_layers[0].value
-        self.value = self._sigmoid(input_value)
+        self.linear_transform()
 
     def backward(self):
-        """
-        Calculates the gradient using the derivative of
-        the sigmoid function.
-        """
-        # Initialize the gradients to 0.
-        self.gradients = {n: np.zeros_like(n.value) for n in self.incoming_layers}
-        # Sum the partial with respect to the input over all the outputs.
-        for n in self.outbound_layers:
-            grad_cost = n.gradients[self]
-            sigmoid = self.value
-            self.gradients[self.incoming_layers[0]] += sigmoid * (1 - sigmoid) * grad_cost
-
+        self.d_l3 = self.d_b2 = self.outbound_layers[0].gradient
+        self.d_l2 = self.input_gradient * self.w.T
+        self.d_w2 =  self.d_l * self.x.T
+        self.gradient = self.input_gradient + self.d_l3 + self.d_l2 + self.d_w2 + self.d_l3
+        
 
 class Softmax(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
@@ -141,8 +91,7 @@ class Softmax(Layer):
         return np.exp(x) / np.sum(np.exp(x), axis=0)
 
     def forward(self):
-        """ Perform the sigmoid function and set the value."""
-
+        """ Perform the sigmoid function and set the value. """
         input_value = self.incoming_layers[0].value
         self.value = self._softmax(input_value)
 
@@ -151,12 +100,9 @@ class Softmax(Layer):
         Calculates the gradient using the derivative of
         the softmax function.
         """
-        if isinstance(self.gradient, float):
-            self.gradient = np.zeros_like(self.value)
-
-        for n in self.outbound_layers:
-            incoming_grad = n.gradient
-        self.gradient += incoming_grad * self.g_prime()
+        # gradient of cross entropy which is 1
+        self.input_gradient = self.outbound_layers[0].gradient
+        self.gradient = self.input_gradient * (self.value - self.ideal_output)
 
 class CrossEntropy(Layer):
     def __init__(self, inbound_layer):
@@ -171,7 +117,7 @@ class CrossEntropy(Layer):
         Layer.__init__(self, [inbound_layer])
         self.ideal_output = None
         self.n_inputs = None
-        self.value = 0.
+        self.value = 1.
 
     def forward(self):
         """
@@ -179,49 +125,13 @@ class CrossEntropy(Layer):
         """
         # Save the computed output for backward.
         self.computed_output = self.incoming_layers[0].value
-        self.value += -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
+        self.value = -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
 
     def backward(self):
         """
         Calculates the gradient of the cost.
         """
-        self.gradient += (self.computed_output - self.ideal_output)
-
-            
-class MSE(Layer):
-    def __init__(self, inbound_layer):
-        """
-        The mean squared error cost function.
-        Should be used as the last layer for a network.
-
-        Arguments:
-            `inbound_layer`: A layer with an activation function.
-        """
-        # Call the base class' constructor.
-        Layer.__init__(self, [inbound_layer])
-        """
-        These two properties are set during topological_sort()
-        """
-        # The ideal_output for forward().
-        self.ideal_output = None
-        # The number of inputs for forward().
-        self.n_inputs = None
-
-    def forward(self):
-        """
-        Calculates the mean squared error.
-        """
-        # Save the computed output for backward.
-        self.computed_output = self.incoming_layers[0].value
-        first_term = 1. / (2. * self.n_inputs)
-        norm = np.linalg.norm(self.ideal_output - self.computed_output)
-        self.value = first_term * np.square(norm)
-
-    def backward(self):
-        """
-        Calculates the gradient of the cost.
-        """
-        self.gradients[self.incoming_layers[0]] = -2 * (self.ideal_output - self.computed_output)
+        self.gradient = 1
 
 
 def topological_sort(feed_dict, ideal_output):
@@ -256,7 +166,7 @@ def topological_sort(feed_dict, ideal_output):
 
         if isinstance(n, Input):
             n.value = feed_dict[n]
-        if isinstance(n, CrossEntropy) or isinstance(n, MSE):
+        if isinstance(n, CrossEntropy) or isinstance(n, Softmax):
             n.ideal_output = ideal_output
             # there is only 1 input in this example
             n.n_inputs = 1
