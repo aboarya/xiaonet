@@ -14,7 +14,7 @@ def load_mnist_training():
     for row in rows:
         data[str(i)] = dict(
             digit=int(row[0]),
-            img=(np.asfarray(row[1:]).flatten() / 255.0 * 0.99) + 0.01,
+            img=(np.asfarray(row[1:]) / 255.0 * 0.99) + 0.01,
             
         )
         label = np.zeros(10) + 0.01

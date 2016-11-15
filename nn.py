@@ -4,7 +4,7 @@ import xiaoloader
 from xiaonet import *
 
 
-def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.1):
+def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.5):
     """
     Performs many forward passes and a backward passes through
     a list of sorted Layers while performing stochastic gradient
@@ -25,20 +25,20 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
     for i in range(epochs):
         # Forward pass
         for n in sorted_layers:
-            
             n.forward()
             
         for n in reversed_layers:
-            print(type(n))
             n.backward()
 
         # Performs SGD
         input_layer = sorted_layers[0]
-        partials = (input_layer.d_w1, input_layer.d_b1, input_layer.d_b2,)
+        hidden_layer = input_layer.outbound_layers[0]
+        partials = (input_layer.d_w2, input_layer.d_b1, input_layer.d_b2,)
 
         # Loop over the trainables
         for n in range(len(trainables)):
             trainables[n] -= learning_rate * partials[n]
+        print("Loss is now : ", reversed_layers[0].value)
 
     return (reversed_layers[0].value,)+partials
 
@@ -48,17 +48,21 @@ mnist_data = xiaoloader.load_mnist_training()
 training_data = {k:v for k,v in mnist_data.items() if int(k) >= (len(mnist_data.keys())*.7)}
 validation_data = {k:v for k,v in mnist_data.items() if int(k) < (len(mnist_data.keys())*.7)}
 
-w1 = np.random.normal(0.0, pow(10, -0.5), (784, 10))
-w2 = np.random.normal(0.0, pow(10, -0.5), 10)
-
-b1 = np.random.normal(0.0, pow(10, -0.5), 10)
-b2 = np.random.normal(0.0, pow(10, -0.5), 10)
-
-def train_mnist(w1, w2, b1 ,b2):
+def train_mnist():
     print("beginning training")
+    keys = sorted(training_data.keys())
     i = 0
-    for index, data in training_data.items():
+    for key in keys:
+        i += 1
+        w1 = np.random.normal(0.0, pow(10, -0.5), (784,))
+        w2 = np.random.normal(0.0, pow(10, -0.5), (784, 10))
+
+        b1 = np.random.normal(0.0, pow(10, -0.5), 10)
+        b2 = np.random.normal(0.0, pow(10, -0.5), 10)
+
+        data = training_data[key]
         digit = data['digit']
+        print(digit)
         x =  data['img']
         inputs = Input(x, w1, b1)
         f = Linear(inputs, w2, b2)
@@ -67,10 +71,11 @@ def train_mnist(w1, w2, b1 ,b2):
         
         ideal_output = data['label']
         feed_dict = {inputs: x}
-        loss, w1, w2, b1, b2 = train_SGD(feed_dict, ideal_output, [w1, w2, b1, b2], 5)
-        print("Loss is now : ", loss)
-
-train_mnist(w1, w2, b1, b2)    
+        loss, w2, b1, b2 = train_SGD(feed_dict, ideal_output, [w2, b1, b2], 10)
+        print("")
+        if i > 5: break
+    
+train_mnist()    
 import sys;sys.exit(1)
 correct = 0
 for index, data in validation_data.items():

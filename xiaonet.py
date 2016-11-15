@@ -37,7 +37,7 @@ class Layer:
         """ perform linear transorm """
         h = np.dot(self.x.T, self.w)
         self.value = h + self.b
-
+        print(">>", type(self), self.value.shape)
 
 class Input(Layer):
     """ Represets all the Hidden Layers """
@@ -48,33 +48,29 @@ class Input(Layer):
         self.b = bias
         
     def forward(self):
-        Layer.linear_transform(self)
+        self.value = self.x * self.w
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
-        #self.input_gradient = self.outbound_layers[0].gradient
-        self.d_w1 = self.outbound_layers[0].gradient * self.x.T
-        self.d_b1 = self.outbound_layers[0].gradient
-        self.d_b2 = self.outbound_layers[0].gradient1
-
+        self.d_b2 = np.dot(self.outbound_layers[0].gradient.T, self.x)
+        self.d_w2 = self.outbound_layers[0].gradient
+        self.d_b1 = self.outbound_layers[0].gradient1
 
 class Linear(Layer):
         
     def __init__(self, input_layer, weights, bias):
         Layer.__init__(self, [input_layer])
-        #self.x = self.incoming_layers[0].value
         self.w = weights
         self.b = bias
 
     def forward(self):
         self.x = self.incoming_layers[0].value
-        h = self.x.T * self.w
-        print(">>>", h.shape)
+        h = np.dot(self.x.T, self.w)
         self.value = h + self.b
-        
+         
     def backward(self):
         self.input_gradient = self.outbound_layers[0].gradient
-        self.gradient = self.input_gradient * self.w.T
+        self.gradient = self.input_gradient * self.w
         self.gradient1 = self.outbound_layers[0].gradient
 
 
