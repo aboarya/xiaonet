@@ -35,7 +35,7 @@ class Layer:
 
     def linear_transform(self):
         """ perform linear transorm """
-        h = np.sum(np.dot(self.x.T, self.w))
+        h = np.dot(self.x.T, self.w)
         self.value = h + self.b
 
 
@@ -56,28 +56,27 @@ class Input(Layer):
         self.d_w1 = self.outbound_layers[0].gradient * self.x.T
         self.d_b1 = self.outbound_layers[0].gradient
         self.d_b2 = self.outbound_layers[0].gradient1
-        
 
-                                         
+
 class Linear(Layer):
         
     def __init__(self, input_layer, weights, bias):
         Layer.__init__(self, [input_layer])
-        self.x = self.incoming_layers[0].value
+        #self.x = self.incoming_layers[0].value
         self.w = weights
         self.b = bias
 
     def forward(self):
-        Layer.linear_transform(self)
-
+        self.x = self.incoming_layers[0].value
+        h = self.x.T * self.w
+        print(">>>", h.shape)
+        self.value = h + self.b
+        
     def backward(self):
-        #self.d_l3 = self.d_b2 = self.outbound_layers[0].gradient
+        self.input_gradient = self.outbound_layers[0].gradient
         self.gradient = self.input_gradient * self.w.T
         self.gradient1 = self.outbound_layers[0].gradient
-        #self.d_w2 =  self.d_l * self.x.T
-        #self.gradient = self.input_gradient + self.d_l3 + self.d_l2 + self.d_w2 + self.d_l3
-        pass
-        
+
 
 class Softmax(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
