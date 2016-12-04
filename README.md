@@ -1,5 +1,5 @@
 # xiaonet
-A Xiao (Tiny) Neural Network to illustrate the basics of forward and backpropegation, activation using sigmoid, and softmax, cost optimization using mean squared error and cross entropy.
+A Xiao (Tiny) Neural Network to illustrate the basics of forward and backpropegation, activation using, and softmax, logistic regression with cross entropy and cost minimization with gradient descent.
 
 ```python
 # load the complete MNIST dataset
@@ -17,4 +17,3 @@ plot_images(images, labels)
 
 
 ![png](images/output_1_0.png)
-
