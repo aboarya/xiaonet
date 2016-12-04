@@ -3,7 +3,7 @@ A Xiao (Tiny) Neural Network to illustrate the basics of forward and backpropega
 
 ```python
 from xiaonet import *
-
+```
 ```python
 # load the complete MNIST dataset
 from xiaoloader import load_mnist
