@@ -147,7 +147,7 @@ def extract_images(f):
     ValueError: If the bytestream does not start with 2051.
 
   """
-  print('Extracting', f.name)
+  #print('Extracting', f.name)
   if f:
     bytestream = f
     magic = _read32(bytestream)
@@ -186,7 +186,7 @@ def extract_labels(f, one_hot=False, num_classes=10):
   Raises:
     ValueError: If the bystream doesn't start with 2049.
   """
-  print('Extracting', f.name)
+  #print('Extracting', f.name)
   if f:
     bytestream = f
     magic = _read32(bytestream)
