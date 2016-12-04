@@ -14,7 +14,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 images = dataset.train.images[0:4]
-labels = np.array([label.argmax() for label in dataset.test.labels[0:4]])
+labels = np.array([label.argmax() for label in dataset.train.labels[0:4]])
 plot_images(images, labels)
 ```
 ![png](images/output_1_0.png)
