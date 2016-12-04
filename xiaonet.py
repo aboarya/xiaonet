@@ -33,12 +33,6 @@ class Layer:
         """
         raise NotImplementedError
 
-    def linear_transform(self):
-        """ perform linear transorm """
-        h = np.dot(self.x.T, self.w)
-        self.value = h + self.b
-        print(">>", type(self), self.value.shape)
-
 class Input(Layer):
     """ Represets all the Hidden Layers """
     def __init__(self, feature, weights, bias):
@@ -48,7 +42,8 @@ class Input(Layer):
         self.b = bias
         
     def forward(self):
-        self.value = self.x * self.w
+        h = np.dot(self.x, self.w)
+        self.value = h + self.b
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
@@ -65,7 +60,7 @@ class Linear(Layer):
 
     def forward(self):
         self.x = self.incoming_layers[0].value
-        h = np.dot(self.x.T, self.w)
+        h = np.dot(self.x, self.w)
         self.value = h + self.b
          
     def backward(self):
