@@ -1,5 +1,7 @@
-import numpy as np
 import random
+
+import numpy as np
+import matplotlib.pyplot as plt
 
 class Layer:
     """
@@ -35,15 +37,32 @@ class Layer:
 
 class Input(Layer):
     """ Represets all the Hidden Layers """
-    def __init__(self, feature, weights, bias):
+    def __init__(self, weights, bias):
         Layer.__init__(self)
-        self.x = feature
-        self.w = weights
-        self.b = bias
+        self.W = weights
+        self.X = images
+        self.biases = bias
+
+        self.num_images = self.X.shape[0]
+        self.num_weights = self.W.shape[0]
+        self.num_classes = self.biases.shape[1]
+        self.value = np.empty((self.num_images, self.num_classes))
+
+        assert(self.num_images == self.num_weights,
+            "the number of images provides are {} but {} weights are provided ".format(self.num_images,
+                self.num_weights))
+
+        assert(self.num_classes == self.W.shape[1],
+            "the number of classes {} is unbalanced with the shape of the weights {}".format(self.num_classes, self.W.shape))
+
+    def _forward(self):
+
         
     def forward(self):
-        h = np.dot(self.x, self.w)
-        self.value = h + self.b
+        """Layer: Input.  execute W * X + b for the entire batch"""
+        for i in range(self.num_images):
+            h = np.np.dot(self.X[i], self.W[i])
+            self.value[i] = h + self.biases[i]
 
     def backward(self):
         """ Calculates the gradient based on the output values."""
@@ -51,29 +70,55 @@ class Input(Layer):
         self.d_w2 = self.outbound_layers[0].gradient
         self.d_b1 = self.outbound_layers[0].gradient1
 
-class Linear(Layer):
+class Hidden(Layer):
         
     def __init__(self, input_layer, weights, bias):
         Layer.__init__(self, [input_layer])
-        self.w = weights
-        self.b = bias
+        self.X = None
+        self.W = weights
+        self.biases = bias
+
+        self.num_neurons = self.bias.shape[1]
+        self.num_classes = self.input_layer.num_classes
+        self.num_images = self.input_layer.num_images
+
+        self.value = np.empty((self.num_images, self.num_classes))
 
     def forward(self):
-        self.x = self.incoming_layers[0].value
-        h = np.dot(self.x, self.w)
-        self.value = h + self.b
+        """ Layer: Hidden.  N * P + b"""
+        self.X = self.incoming_layers[0].value
+        for i in range(self.num_images):
+            h = np.np.dot(self.X[i], self.W[i])
+            self.value[i] = h + self.biases[i]
          
     def backward(self):
         self.input_gradient = self.outbound_layers[0].gradient
         self.gradient = self.input_gradient * self.w
         self.gradient1 = self.outbound_layers[0].gradient
 
+# class ReLU(Layer):
+        
+#     def __init__(self, input_layer):
+#         Layer.__init__(self, [input_layer])
+
+#     def forward(self):
+#         """ Layer: ReLU.  execute np.maximum"""
+#         self.X = self.incoming_layers[0].value
+#         self.value = np.maximum(self.x, 0)
+         
+#     def backward(self):
+#         raise NotImplementedError
 
 class Softmax(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
     
-    def __init__(self, layer):
+    def __init__(self, input_layer):
         Layer.__init__(self, [layer])
+
+        self.num_classes = self.input_layer.num_classes
+        self.num_images = self.input_layer.num_images
+
+        self.value = np.empty((self.num_images, self.num_classes))
 
     def _softmax(self, x):
         """
@@ -86,7 +131,8 @@ class Softmax(Layer):
     def forward(self):
         """ Perform the sigmoid function and set the value. """
         input_value = self.incoming_layers[0].value
-        self.value = self._softmax(input_value)
+        for i in range(self.num_images):
+            self.value[i] = self._softmax(input_value[i])
 
     def backward(self):
         """
@@ -108,23 +154,52 @@ class CrossEntropy(Layer):
         """
         # Call the base class' constructor.
         Layer.__init__(self, [inbound_layer])
+
         self.ideal_output = None
-        self.n_inputs = None
-        self.value = 1.
+        self.num_classes = self.input_layer.num_classes
+        self.num_images = self.input_layer.num_images
+
+        self.tmp_value = np.empty((self.num_classes,))
 
     def forward(self):
         """
         Calculates the cross entropy.
         """
         # Save the computed output for backward.
-        self.computed_output = self.incoming_layers[0].value
-        self.value = -np.sum(np.multiply(self.ideal_output, np.log(self.computed_output)))
+        self.softmax = self.incoming_layers[0].value
+        for i in range(self.num_images):
+           self.tmp_value = -np.sum(np.multiply(self.ideal_output[i], np.log(self.softmax[i])))
+
+        self.value = np.mean(self.tmp_value)
 
     def backward(self):
         """
         Calculates the gradient of the cost.
         """
         self.gradient = 1
+
+def plot_images(images, labels, cls_pred=None):
+    assert len(images) == len(labels) == 4
+    
+    # Create figure with 2x2 sub-plots.
+    fig, axes = plt.subplots(2, 2, figsize=(2,2))
+    fig.subplots_adjust(hspace=0.3, wspace=0.3)
+
+    for i, ax in enumerate(axes.flat):
+        # Plot image.
+        ax.imshow(images[i].reshape((28, 28)), cmap='binary')
+
+        # Show true and predicted classes.
+        if cls_pred is None:
+            xlabel = "True: {0}".format(labels[i])
+        else:
+            xlabel = "True: {0}, Pred: {1}".format(cls_true[i], cls_pred[i])
+
+        ax.set_xlabel(xlabel)
+        
+        # Remove ticks from the plot.
+        ax.set_xticks([])
+        ax.set_yticks([])
 
 
 def topological_sort(feed_dict, ideal_output):
@@ -158,7 +233,7 @@ def topological_sort(feed_dict, ideal_output):
         n = S.pop()
 
         if isinstance(n, Input):
-            n.value = feed_dict[n]
+            n.images = feed_dict[n]
         if isinstance(n, CrossEntropy) or isinstance(n, Softmax):
             n.ideal_output = ideal_output
             # there is only 1 input in this example
@@ -234,4 +309,4 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
             trainables[n] -= learning_rate * partials[n]
         print("Loss is now : ", reversed_layers[0].value)
 
-    return (reversed_layers[0].value,)+partials
+    return sorted_layers[-1].value
