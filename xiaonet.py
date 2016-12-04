@@ -172,3 +172,66 @@ def topological_sort(feed_dict, ideal_output):
             if len(G[m]['in']) == 0:
                 S.add(m)
     return L
+
+
+def plot_images(images, labels, cls_pred=None):
+    assert len(images) == len(labels) == 4
+    
+    # Create figure with 2x2 sub-plots.
+    fig, axes = plt.subplots(2, 2, figsize=(2,2))
+    fig.subplots_adjust(hspace=0.3, wspace=0.3)
+
+    for i, ax in enumerate(axes.flat):
+        # Plot image.
+        ax.imshow(images[i].reshape((28, 28)), cmap='binary')
+
+        # Show true and predicted classes.
+        if cls_pred is None:
+            xlabel = "True: {0}".format(labels[i])
+        else:
+            xlabel = "True: {0}, Pred: {1}".format(cls_true[i], cls_pred[i])
+
+        ax.set_xlabel(xlabel)
+        
+        # Remove ticks from the plot.
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+
+def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.5):
+    """
+    Performs many forward passes and a backward passes through
+    a list of sorted Layers while performing stochastic gradient
+    descent.
+
+    Arguments:
+
+        `feed_dict`: A dictionary where the key is a `Input` Layer and the value is the respective value feed to that Layer.
+        `ideal_output`: The correct output value for the last activation layer.
+        `trainables`: Inputs that need to be modified by SGD.
+        `epochs`: The number of times to train against all training inputs.
+        `learning_rate`: The step size for changes by each gradient.
+    """
+
+    sorted_layers = topological_sort(feed_dict, ideal_output)
+    reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
+            
+    for i in range(epochs):
+        # Forward pass
+        for n in sorted_layers:
+            n.forward()
+            
+        for n in reversed_layers:
+            n.backward()
+
+        # Performs SGD
+        input_layer = sorted_layers[0]
+        hidden_layer = input_layer.outbound_layers[0]
+        partials = (input_layer.d_w2, input_layer.d_b1, input_layer.d_b2,)
+
+        # Loop over the trainables
+        for n in range(len(trainables)):
+            trainables[n] -= learning_rate * partials[n]
+        print("Loss is now : ", reversed_layers[0].value)
+
+    return (reversed_layers[0].value,)+partials
