@@ -1,4 +1,5 @@
 import random
+from itertools import chain
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,15 +12,13 @@ class Layer:
 
         `inbound_layers`: A list of layers with edges into this layer.
     """
-    def __init__(self, incoming_layers=[]):
+    def __init__(self, input_layer=None):
         """ Simple constructor """
-        self.incoming_layers = incoming_layers
-        self.value = None
+        self.input_layer = input_layer
         self.outbound_layers = []
-        self.gradient = 0.
         
-        for layer in incoming_layers:
-            layer.outbound_layers.append(self)
+        if self.input_layer:
+            self.input_layer.outbound_layers.append(self)
 
     def forward():
         """
@@ -39,62 +38,74 @@ class Input(Layer):
     """ Represets all the Hidden Layers """
     def __init__(self, weights, bias):
         Layer.__init__(self)
-        self.W = weights
-        self.X = images
-        self.biases = bias
-
-        self.num_images = self.X.shape[0]
-        self.num_weights = self.W.shape[0]
-        self.num_classes = self.biases.shape[1]
-        self.value = np.empty((self.num_images, self.num_classes))
-
-        assert(self.num_images == self.num_weights,
-            "the number of images provides are {} but {} weights are provided ".format(self.num_images,
-                self.num_weights))
-
-        assert(self.num_classes == self.W.shape[1],
-            "the number of classes {} is unbalanced with the shape of the weights {}".format(self.num_classes, self.W.shape))
-
-    def _forward(self):
-
-        
-    def forward(self):
-        """Layer: Input.  execute W * X + b for the entire batch"""
-        for i in range(self.num_images):
-            h = np.np.dot(self.X[i], self.W[i])
-            self.value[i] = h + self.biases[i]
-
-    def backward(self):
-        """ Calculates the gradient based on the output values."""
-        self.d_b2 = np.dot(self.outbound_layers[0].gradient.T, self.x)
-        self.d_w2 = self.outbound_layers[0].gradient
-        self.d_b1 = self.outbound_layers[0].gradient1
-
-class Hidden(Layer):
-        
-    def __init__(self, input_layer, weights, bias):
-        Layer.__init__(self, [input_layer])
         self.X = None
         self.W = weights
         self.biases = bias
 
-        self.num_neurons = self.bias.shape[1]
-        self.num_classes = self.input_layer.num_classes
+        self.num_neurons = self.W.shape[-1]
+        self.num_images = self.W.shape[0]
+        self.num_features = self.W.shape[1]
+
+        self.W_gradients = np.empty((self.num_images, self.num_features))
+        self.b_gradients = np.empty((self.num_images,))
+        self.gradients = np.empty((self.num_images, self.num_features))
+
+        self.value = np.empty((self.num_images, self.num_neurons))
+
+    def _set(self, images):
+        self.X = images
+        
+    def forward(self):
+        """Layer: Input.  execute W * X + b for the entire batch"""
+        for i in range(self.num_images):
+            h = np.dot(self.X[i], self.W[i])
+            self.value[i] = h + self.biases[i]
+
+    def backward(self):
+        """ Gradient: Input Layer"""
+        self.input_gradients = self.outbound_layers[0].gradients
+        for i in range(self.num_images):
+            self.W_gradients[i] = np.dot(self.W[i], self.input_gradients[i])
+            self.b_gradients[i] = np.dot(self.input_gradients[i], self.biases[i])
+
+            self.gradients[i] = self.W_gradients[i] * self.b_gradients[i]
+
+class Hidden(Layer):
+        
+    def __init__(self, input_layer, weights, bias):
+        Layer.__init__(self, input_layer)
+        self.X = None
+        self.W = weights
+        self.biases = bias
+
+        self.num_classes = self.W.shape[-1]
         self.num_images = self.input_layer.num_images
 
         self.value = np.empty((self.num_images, self.num_classes))
+        self.W_gradients = np.empty((self.num_images, self.input_layer.num_neurons))
+        self.b_gradients = np.empty((self.num_images,))
+        self.gradients = np.empty((self.num_images, self.input_layer.num_neurons))
+
 
     def forward(self):
         """ Layer: Hidden.  N * P + b"""
-        self.X = self.incoming_layers[0].value
+        self.X = self.input_layer.value
         for i in range(self.num_images):
-            h = np.np.dot(self.X[i], self.W[i])
+            h = np.dot(self.X[i], self.W[i])
             self.value[i] = h + self.biases[i]
          
     def backward(self):
-        self.input_gradient = self.outbound_layers[0].gradient
-        self.gradient = self.input_gradient * self.w
-        self.gradient1 = self.outbound_layers[0].gradient
+        """ Gradient: Hidden Layer"""
+        self.input_gradients = self.outbound_layers[0].gradients
+        for i in range(self.num_images):
+            self.W_gradients[i] = np.dot(self.W[i], self.input_gradients[i])
+            self.b_gradients[i] = np.dot(self.input_gradients[i], self.biases[i])
+            #print(self.W_gradients[i].shape, self.b_gradients[i], (self.W_gradients[i] * self.b_gradients[i]).shape)
+            self.gradients[i] = self.W_gradients[i] * self.b_gradients[i]
+
+        # self.input_gradient = self.outbound_layers[0].gradient
+        # self.gradient = self.input_gradient * self.w
+        # self.gradient1 = self.outbound_layers[0].gradient
 
 # class ReLU(Layer):
         
@@ -103,7 +114,7 @@ class Hidden(Layer):
 
 #     def forward(self):
 #         """ Layer: ReLU.  execute np.maximum"""
-#         self.X = self.incoming_layers[0].value
+#         self.X = self.input_layer.value
 #         self.value = np.maximum(self.x, 0)
          
 #     def backward(self):
@@ -113,12 +124,13 @@ class Softmax(Layer):
     """ Represents a layer that performs the sigmoid activation function. """
     
     def __init__(self, input_layer):
-        Layer.__init__(self, [layer])
+        Layer.__init__(self, input_layer)
 
         self.num_classes = self.input_layer.num_classes
         self.num_images = self.input_layer.num_images
 
         self.value = np.empty((self.num_images, self.num_classes))
+        self.gradients = np.empty((self.num_images, self.num_classes))
 
     def _softmax(self, x):
         """
@@ -130,21 +142,31 @@ class Softmax(Layer):
 
     def forward(self):
         """ Perform the sigmoid function and set the value. """
-        input_value = self.incoming_layers[0].value
+        input_value = self.input_layer.value
         for i in range(self.num_images):
             self.value[i] = self._softmax(input_value[i])
+
+    # def _gradient_softmax(self, theta, x, y):
+    #     first_calc = _softmax(theta, x) - np.squeeze(y)
+    #     final_calc = first_calc.T.dot(x)
+
+    #     input_value = self.input_layer.value
+
+    #     for i in range(self.num_images):
+    #         self.gradients[i] = self._gradient_softmax()
+    #     return final_calc
 
     def backward(self):
         """
         Calculates the gradient using the derivative of
         the softmax function.
         """
-        # gradient of cross entropy which is 1
-        self.input_gradient = self.outbound_layers[0].gradient
-        self.gradient = self.input_gradient * (self.value - self.ideal_output)
+        for i in range(self.num_images):
+            self.gradients[i] = self.value[i].T
+
 
 class CrossEntropy(Layer):
-    def __init__(self, inbound_layer):
+    def __init__(self, input_layer):
         """
         The multi-class classifier.
         Should be used as the last layer for a network.
@@ -153,22 +175,22 @@ class CrossEntropy(Layer):
             `inbound_layer`: A layer with an activation function.
         """
         # Call the base class' constructor.
-        Layer.__init__(self, [inbound_layer])
+        Layer.__init__(self, input_layer)
 
         self.ideal_output = None
         self.num_classes = self.input_layer.num_classes
         self.num_images = self.input_layer.num_images
 
-        self.tmp_value = np.empty((self.num_classes,))
+        self.tmp_value = np.empty((self.num_images,))
 
     def forward(self):
         """
         Calculates the cross entropy.
         """
         # Save the computed output for backward.
-        self.softmax = self.incoming_layers[0].value
+        self.softmax = self.input_layer.value
         for i in range(self.num_images):
-           self.tmp_value = -np.sum(np.multiply(self.ideal_output[i], np.log(self.softmax[i])))
+           self.tmp_value[i] = -np.sum(np.multiply(self.ideal_output[i], np.log(self.softmax[i])))
 
         self.value = np.mean(self.tmp_value)
 
@@ -176,7 +198,7 @@ class CrossEntropy(Layer):
         """
         Calculates the gradient of the cost.
         """
-        self.gradient = 1
+        self.gradient = None
 
 def plot_images(images, labels, cls_pred=None):
     assert len(images) == len(labels) == 4
@@ -233,8 +255,8 @@ def topological_sort(feed_dict, ideal_output):
         n = S.pop()
 
         if isinstance(n, Input):
-            n.images = feed_dict[n]
-        if isinstance(n, CrossEntropy) or isinstance(n, Softmax):
+            n._set(feed_dict[n])
+        if isinstance(n, CrossEntropy):
             n.ideal_output = ideal_output
             # there is only 1 input in this example
             n.n_inputs = 1
@@ -273,7 +295,7 @@ def plot_images(images, labels, cls_pred=None):
         ax.set_yticks([])
 
 
-def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.5):
+def train_SGD(feed_dict, ideal_output, trainables=[], learning_rate=1e-4):
     """
     Performs many forward passes and a backward passes through
     a list of sorted Layers while performing stochastic gradient
@@ -291,7 +313,7 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
     sorted_layers = topological_sort(feed_dict, ideal_output)
     reversed_layers = sorted_layers[::-1] # see: https://docs.python.org/2.3/whatsnew/section-slices.html
             
-    for i in range(epochs):
+    if True:
         # Forward pass
         for n in sorted_layers:
             n.forward()
@@ -300,13 +322,12 @@ def train_SGD(feed_dict, ideal_output, trainables=[], epochs=1, learning_rate=0.
             n.backward()
 
         # Performs SGD
-        input_layer = sorted_layers[0]
-        hidden_layer = input_layer.outbound_layers[0]
-        partials = (input_layer.d_w2, input_layer.d_b1, input_layer.d_b2,)
+        layers = sorted_layers[0:-2]
+        partials = [item for sublist in [(layer.W_gradients, layer.b_gradients,) for layer in layers] for item in sublist]
 
-        # Loop over the trainables
         for n in range(len(trainables)):
-            trainables[n] -= learning_rate * partials[n]
-        print("Loss is now : ", reversed_layers[0].value)
+            if trainables[n].shape == partials[n].shape:
+                print("ok")
+                trainables[n] -= learning_rate * partials[n]
 
     return sorted_layers[-1].value
