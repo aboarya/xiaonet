@@ -200,7 +200,7 @@ class CrossEntropy(Layer):
         """
         self.gradient = None
 
-def plot_images(images, labels, cls_pred=None):
+def plot_images(images, labels, pred_labels=None):
     assert len(images) == len(labels) == 4
     
     # Create figure with 2x2 sub-plots.
@@ -212,10 +212,10 @@ def plot_images(images, labels, cls_pred=None):
         ax.imshow(images[i].reshape((28, 28)), cmap='binary')
 
         # Show true and predicted classes.
-        if cls_pred is None:
+        if pred_labels is None:
             xlabel = "True: {0}".format(labels[i])
         else:
-            xlabel = "True: {0}, Pred: {1}".format(cls_true[i], cls_pred[i])
+            xlabel = "True: {0}, Pred: {1}".format(cls_true[i], pred_labels[i])
 
         ax.set_xlabel(xlabel)
         
